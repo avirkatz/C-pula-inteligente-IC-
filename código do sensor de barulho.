@@ -1,0 +1,207 @@
+/*
+ * CúpulaSync - Módulo de Sensor de Som
+ * Grupo: InovaCúpula
+ * 
+ * Descrição: Detecta níveis de som e ativa motor vibrador
+ * quando o barulho atinge 70-100 dB
+ * VERSÃO SEM TRANSISTOR - Usa PWM para controle de potência
+ */
+
+// Definição dos pinos
+const int PINO_MICROFONE = A0;  // Pino analógico para o microfone
+const int PINO_MOTOR_VIBRADOR = 9;  // Pino PWM para o motor vibrador
+
+// Configurações de calibração do sensor
+const int NUM_AMOSTRAS = 100;  // Número de amostras para calcular média
+const int DELAY_AMOSTRA = 5;   // Delay entre amostras em ms
+
+// Limiares de detecção (valores analógicos)
+// Estes valores precisam ser calibrados com seu microfone específico
+const int LIMIAR_MINIMO = 300;  // Aproximadamente 70 dB
+const int LIMIAR_MAXIMO = 600;  // Aproximadamente 100 dB
+
+// Controle de potência do motor (0-255)
+// Valores mais baixos consomem menos corrente e protegem o Arduino
+const int POTENCIA_MOTOR = 150;  // ~60% da potência máxima (ajuste conforme necessário)
+
+// Variáveis de controle
+int nivelSom = 0;
+bool motorAtivo = false;
+unsigned long tempoUltimaLeitura = 0;
+const int INTERVALO_LEITURA = 100;  // Leitura a cada 100ms
+
+void setup() {
+  // Inicialização da comunicação serial para debug
+  Serial.begin(9600);
+  
+  // Configuração dos pinos
+  pinMode(PINO_MICROFONE, INPUT);
+  pinMode(PINO_MOTOR_VIBRADOR, OUTPUT);
+  
+  // Garante que o motor começa desligado
+  analogWrite(PINO_MOTOR_VIBRADOR, 0);
+  
+  Serial.println("=== CúpulaSync - Sensor de Som ===");
+  Serial.println("Sistema inicializado!");
+  Serial.println("Versão: SEM TRANSISTOR (PWM)");
+  Serial.print("Potência do motor: ");
+  Serial.print((POTENCIA_MOTOR * 100) / 255);
+  Serial.println("%");
+  Serial.println("Monitorando níveis de som...");
+  Serial.println();
+}
+
+void loop() {
+  unsigned long tempoAtual = millis();
+  
+  // Verifica se é hora de fazer nova leitura
+  if (tempoAtual - tempoUltimaLeitura >= INTERVALO_LEITURA) {
+    tempoUltimaLeitura = tempoAtual;
+    
+    // Lê o nível de som atual
+    nivelSom = lerNivelSom();
+    
+    // Verifica se o som está na faixa de 70-100 dB
+    if (nivelSom >= LIMIAR_MINIMO && nivelSom <= LIMIAR_MAXIMO) {
+      ativarMotor();
+    } else {
+      desativarMotor();
+    }
+    
+    // Exibe informações no monitor serial
+    exibirStatus();
+  }
+}
+
+/*
+ * Função: lerNivelSom
+ * Descrição: Lê múltiplas amostras do microfone e calcula
+ * o pico de amplitude para determinar o nível de som
+ */
+int lerNivelSom() {
+  int valorMinimo = 1024;
+  int valorMaximo = 0;
+  
+  // Coleta amostras durante um curto período
+  for (int i = 0; i < NUM_AMOSTRAS; i++) {
+    int leitura = analogRead(PINO_MICROFONE);
+    
+    // Atualiza valores mínimo e máximo
+    if (leitura < valorMinimo) {
+      valorMinimo = leitura;
+    }
+    if (leitura > valorMaximo) {
+      valorMaximo = leitura;
+    }
+    
+    delay(DELAY_AMOSTRA);
+  }
+  
+  // Calcula a amplitude pico-a-pico
+  int amplitude = valorMaximo - valorMinimo;
+  
+  return amplitude;
+}
+
+/*
+ * Função: ativarMotor
+ * Descrição: Liga o motor vibrador com PWM (controle de potência)
+ */
+void ativarMotor() {
+  if (!motorAtivo) {
+    analogWrite(PINO_MOTOR_VIBRADOR, POTENCIA_MOTOR);
+    motorAtivo = true;
+  }
+}
+
+/*
+ * Função: desativarMotor
+ * Descrição: Desliga o motor vibrador
+ */
+void desativarMotor() {
+  if (motorAtivo) {
+    analogWrite(PINO_MOTOR_VIBRADOR, 0);
+    motorAtivo = false;
+  }
+}
+
+/*
+ * Função: exibirStatus
+ * Descrição: Mostra informações no monitor serial para debug
+ */
+void exibirStatus() {
+  Serial.print("Nível de Som: ");
+  Serial.print(nivelSom);
+  Serial.print(" | Motor: ");
+  Serial.print(motorAtivo ? "ATIVADO" : "Desativado");
+  
+  // Barra visual do nível de som
+  Serial.print(" | ");
+  int barras = map(nivelSom, 0, 1024, 0, 20);
+  for (int i = 0; i < barras; i++) {
+    Serial.print("=");
+  }
+  
+  Serial.println();
+}
+
+/*
+ * ============================================================================
+ * INSTRUÇÕES DE USO SEM TRANSISTOR:
+ * ============================================================================
+ * 
+ * AJUSTE DE POTÊNCIA:
+ * - Se o motor vibrar muito fraco, aumente POTENCIA_MOTOR (máximo 255)
+ * - Se o motor não vibrar, verifique as conexões
+ * - Recomendado: mantenha entre 120-180 para proteger o Arduino
+ * 
+ * CALIBRAÇÃO:
+ * 1. Faça o upload deste código para o Arduino
+ * 2. Abra o Monitor Serial (9600 baud)
+ * 3. Observe os valores de "Nível de Som" em diferentes condições:
+ *    - Ambiente silencioso
+ *    - Conversação normal
+ *    - Ambiente barulhento
+ * 4. Ajuste LIMIAR_MINIMO e LIMIAR_MAXIMO baseado nas suas observações
+ * 
+ * CONEXÕES (SIMPLIFICADAS):
+ * 
+ * Microfone (módulo analógico):
+ * - VCC → 5V do Arduino
+ * - GND → GND do Arduino
+ * - OUT → A0 do Arduino
+ * 
+ * Motor Vibrador (conexão direta):
+ * - Terminal positivo → Pino 9 do Arduino
+ * - Terminal negativo → GND do Arduino
+ * 
+ * ⚠️ IMPORTANTE:
+ * - Use apenas motores vibradores pequenos (tipo moeda/pancake)
+ * - Corrente máxima recomendada: 20-30mA
+ * - Se o motor não vibrar adequadamente, considere usar uma fonte externa
+ * - PWM reduz a potência média, permitindo uso direto no pino
+ * 
+ * TIPOS DE MOTOR VIBRADOR COMPATÍVEIS:
+ * - Motor vibrador tipo moeda (coin vibration motor) 3V
+ * - Motor vibrador de celular (reciclado)
+ * - Evite motores maiores sem driver/transistor
+ * ============================================================================
+ */
+
+
+
+
+
+
+ ARDUINO UNO
+┌─────────────────┐
+│                 │
+│  5V ────────────┼──── VCC (Microfone)
+│  GND ───────────┼──── GND (Microfone)
+│  A0 ────────────┼──── OUT (Microfone)
+│                 │
+│  Pin 9 ─────────┼──── (+) Motor Vibrador
+│  GND ───────────┼──── (-) Motor Vibrador
+│                 │
+└─────────────────┘
+
