@@ -1,0 +1,141 @@
+// =================================================================
+// 1. BIBLIOTECAS (As Caixas de Ferramentas)
+// =================================================================
+#include <Adafruit_NeoPixel.h>
+#include "DHT.h"
+
+// =================================================================
+// 2. CONFIGURAÇÕES (O Mapa da Fiação)
+// =================================================================
+#define PIN_DHT 2
+#define PIN_LEDS 6
+#define NUM_LEDS 10
+
+#define DHTTYPE DHT11
+
+// --- NOVO: Sensor de luminosidade (LDR) ---
+#define PIN_LDR A0   // O ponto do meio do divisor de tensão vai no A0
+
+// =================================================================
+// 3. OBJETOS (Dando nome aos bois)
+// =================================================================
+DHT dht(PIN_DHT, DHTTYPE);
+Adafruit_NeoPixel pixels(NUM_LEDS, PIN_LEDS, NEO_GRB + NEO_KHZ800);
+
+// =================================================================
+// 4. PALETA DE CORES
+// =================================================================
+uint32_t corAzulClaro   = pixels.Color(50, 150, 255);
+uint32_t corLaranja     = pixels.Color(255, 100, 0);
+uint32_t corAmarelo     = pixels.Color(255, 255, 0);
+uint32_t corVermelho    = pixels.Color(255, 0, 0);
+uint32_t corCiano       = pixels.Color(0, 255, 255);
+uint32_t corAzul        = pixels.Color(0, 0, 255);
+
+// --- NOVO: Cores para luminosidade ---
+uint32_t corBranco      = pixels.Color(255, 255, 255);
+uint32_t corVerdeEscuro = pixels.Color(0, 120, 0);
+uint32_t corRoxo        = pixels.Color(160, 0, 255);
+
+// =================================================================
+// 4.1 LIMIARES (Ajuste fino das faixas)
+// =================================================================
+// O analogRead no Arduino retorna de 0 até 1023.
+// Esses números variam MUITO com o LDR, o resistor e o ambiente.
+// Depois de ver no Serial, você ajusta até ficar perfeito.
+
+const int LIMIAR_ESCURO   = 300;  // abaixo disso = ambiente escuro
+const int LIMIAR_MODERADO = 700;  // entre 300 e 700 = moderado; acima = iluminado
+
+// =================================================================
+// 5. SETUP (A Preparação)
+// =================================================================
+void setup() {
+  Serial.begin(9600);
+
+  dht.begin();
+  pixels.begin();
+  pixels.clear();
+  pixels.show();
+
+  Serial.println(F("Sistema Iniciado! Lendo sensores..."));
+}
+
+// =================================================================
+// 6. LOOP (O Trabalho Repetitivo)
+// =================================================================
+void loop() {
+  delay(2000);
+
+  // --- LEITURA DOS DADOS ---
+  float umidade = dht.readHumidity();
+  float temperatura = dht.readTemperature();
+
+  // --- NOVO: Leitura do LDR ---
+  int luminosidade = analogRead(PIN_LDR);
+
+  // --- SEGURANÇA (Verificação de Erro) ---
+  if (isnan(umidade) || isnan(temperatura)) {
+    Serial.println(F("Ops! Falha ao ler o sensor DHT!"));
+    return;
+  }
+
+  // ==========================================
+  // LÓGICA DA TEMPERATURA (Controla o LED 0)
+  // ==========================================
+  if (temperatura < 20) {
+    pixels.setPixelColor(0, corAzulClaro);
+  }
+  else if (temperatura >= 20 && temperatura < 25) {
+    pixels.setPixelColor(0, corLaranja);
+  }
+  else if (temperatura >= 25 && temperatura < 30) {
+    pixels.setPixelColor(0, corAmarelo);
+  }
+  else {
+    pixels.setPixelColor(0, corVermelho);
+  }
+
+  // ==========================================
+  // LÓGICA DA UMIDADE (Controla o LED 1)
+  // ==========================================
+  if (umidade < 40) {
+    pixels.setPixelColor(1, corLaranja);
+  }
+  else if (umidade >= 40 && umidade <= 70) {
+    pixels.setPixelColor(1, corCiano);
+  }
+  else {
+    pixels.setPixelColor(1, corAzul);
+  }
+
+  // ==========================================
+  // NOVO: LÓGICA DA LUMINOSIDADE (Controla o LED 2)
+  // ==========================================
+  // Regra:
+  // Ambiente escuro -> Branco
+  // Ambiente moderado -> Verde escuro
+  // Ambiente iluminado -> Roxo
+
+  if (luminosidade < LIMIAR_ESCURO) {
+    pixels.setPixelColor(2, corBranco);
+  }
+  else if (luminosidade >= LIMIAR_ESCURO && luminosidade < LIMIAR_MODERADO) {
+    pixels.setPixelColor(2, corVerdeEscuro);
+  }
+  else {
+    pixels.setPixelColor(2, corRoxo);
+  }
+
+  // --- ATUALIZAÇÃO FINAL ---
+  pixels.show();
+
+  // --- MONITORAMENTO ---
+  Serial.print(F("Temp: "));
+  Serial.print(temperatura);
+  Serial.print(F("°C  |  Umid: "));
+  Serial.print(umidade);
+  Serial.print(F("%  |  Luz (A0): "));
+  Serial.println(luminosidade);
+}
+// a princípio eu li aqui e acho que tá tudo ok. Mais tarde confiro novamente
