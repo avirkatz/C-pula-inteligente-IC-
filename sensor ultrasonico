@@ -1,1 +1,42 @@
+const int pinoTrig = 9; 
+const int pinoEcho = 10; 
 
+
+long duracao;
+int distanciaCm;
+
+void setup() {
+
+  pinMode(pinoTrig, OUTPUT); 
+  pinMode(pinoEcho, INPUT);  
+
+  Serial.begin(9600);
+}
+
+void loop() {
+
+  digitalWrite(pinoTrig, LOW);
+  delayMicroseconds(2);
+
+
+  digitalWrite(pinoTrig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(pinoTrig, LOW);
+
+  duracao = pulseIn(pinoEcho, HIGH);
+
+
+  distanciaCm = duracao / 58;
+
+  if (distanciaCm == 0) {
+
+    distanciaCm = "Objeto fora do alcance ou erro de leitura.";
+  } else {
+    Serial.print("Distancia: ");
+    Serial.print(distanciaCm);
+    Serial.println(" cm");
+  }
+
+  
+  delay(500); 
+}
