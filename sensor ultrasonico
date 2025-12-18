@@ -1,42 +1,106 @@
-const int pinoTrig = 9; 
-const int pinoEcho = 10; 
+
+#include <Adafruit_NeoPixel.h> 
 
 
+const int pinoTrig = 9;   
+const int pinoEcho = 10;  
+
+
+#define PIN_LEDS 6       
+#define NUM_LEDS 10       
+
+
+
+Adafruit_NeoPixel pixels(NUM_LEDS, PIN_LEDS, NEO_GRB + NEO_KHZ800);
+
+
+
+uint32_t corVerde     = pixels.Color(0, 255, 0);   
+uint32_t corAmarelo   = pixels.Color(255, 255, 0);
+uint32_t corVermelho  = pixels.Color(255, 0, 0);  
+uint32_t corAzulClaro = pixels.Color(50, 150, 255); 
+uint32_t corApagado   = pixels.Color(0, 0, 0);     
+
+// Variáveis para o Ultrassônico
 long duracao;
 int distanciaCm;
 
+// =================================================================
+// 5. SETUP (A Preparação)
+// =================================================================
 void setup() {
+  Serial.begin(9600); // Liga a comunicação serial
 
-  pinMode(pinoTrig, OUTPUT); 
-  pinMode(pinoEcho, INPUT);  
+  // Configurações dos pinos do Ultrassônico
+  pinMode(pinoTrig, OUTPUT); // Trigger é SAÍDA
+  pinMode(pinoEcho, INPUT);  // Echo é ENTRADA
 
-  Serial.begin(9600);
+  // Configurações dos LEDs
+  pixels.begin(); // Liga a fita de LED
+  pixels.clear(); // Garante que todos os LEDs comecem apagados
+  pixels.show();  // Envia o comando "apagar" para a fita
+
+  Serial.println(F("Sistema Ultrassonico e LED Iniciado!"));
+  Serial.println(F("------------------------------------"));
 }
 
+// =================================================================
+// 6. LOOP (O Trabalho Repetitivo)
+// =================================================================
 void loop() {
-
+  // --- 1. LEITURA DA DISTÂNCIA (HC-SR04) ---
+  // Limpa o pino Trig e envia o pulso de 10us para iniciar a medição
   digitalWrite(pinoTrig, LOW);
   delayMicroseconds(2);
-
-
   digitalWrite(pinoTrig, HIGH);
   delayMicroseconds(10);
   digitalWrite(pinoTrig, LOW);
 
+  // Mede a duração do pulso de retorno (Echo)
   duracao = pulseIn(pinoEcho, HIGH);
 
-
+  // Converte a duração em distância (cm)
+  // Formula: Distancia = Duracao / 58
   distanciaCm = duracao / 58;
 
-  if (distanciaCm == 0) {
+  // --- 2. LÓGICA DA DISTÂNCIA (Controla o LED 0) ---
+  // O LED 0 será o indicador principal de proximidade
 
-    distanciaCm = "Objeto fora do alcance ou erro de leitura.";
+  if (distanciaCm > 0 && distanciaCm < 10) {
+    // 0 a 10 cm: Muito Perto (Vermelho)
+    pixels.setPixelColor(0, corVermelho);
+  }
+  else if (distanciaCm >= 10 && distanciaCm < 30) {
+    // 10 a 30 cm: Atenção (Amarelo)
+    pixels.setPixelColor(0, corAmarelo);
+  }
+  else if (distanciaCm >= 30) {
+    // 30 cm ou mais: Longe (Verde)
+    pixels.setPixelColor(0, corVerde);
+  }
+  else {
+    // Distância 0 (Fora do alcance, falha do sensor)
+    pixels.setPixelColor(0, corAzulClaro);
+  }
+
+:
+  // for (int i = 1; i < NUM_LEDS; i++) {
+  //   pixels.setPixelColor(i, corApagado);
+  // }
+
+  // --- 3. ATUALIZAÇÃO FINAL ---
+  // Envia os comandos de cor para os LEDs
+  pixels.show();
+
+
+  if (distanciaCm == 0) {
+    Serial.println("Distancia: FORA DO ALCANCE");
   } else {
     Serial.print("Distancia: ");
     Serial.print(distanciaCm);
     Serial.println(" cm");
   }
 
-  
-  delay(500); 
+
+  delay(100);
 }
