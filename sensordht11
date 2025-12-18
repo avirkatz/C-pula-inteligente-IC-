@@ -1,0 +1,135 @@
+// =================================================================
+// 1. BIBLIOTECAS (As Caixas de Ferramentas)
+// =================================================================
+// Aqui nós "pedimos emprestado" códigos prontos.
+// Sem isso, teríamos que programar do zero como o sensor fala com o processador.
+#include <Adafruit_NeoPixel.h> // Caixa de ferramentas para controlar as luzes (LEDs)
+#include "DHT.h"               // Caixa de ferramentas para controlar o sensor de temperatura
+
+// =================================================================
+// 2. CONFIGURAÇÕES (O Mapa da Fiação)
+// =================================================================
+// Aqui definimos onde os fios estão ligados no Arduino.
+// Se você mudar o fio de lugar na placa, só precisa mudar o número aqui.
+
+#define PIN_DHT 2        // O pino de DADOS do sensor está na porta digital 2
+#define PIN_LEDS 6       // O pino de DADOS da fita de LED está na porta digital 6
+#define NUM_LEDS 10      // Avisamos ao Arduino que a fita tem, por exemplo, 10 LEDs (mesmo que a gente use só 2)
+
+#define DHTTYPE DHT11    // Avisamos qual é o modelo do sensor (existe o 11 e o 22)
+
+// =================================================================
+// 3. OBJETOS (Dando nome aos bois)
+// =================================================================
+// Aqui criamos os "representantes" dos componentes no código.
+
+DHT dht(PIN_DHT, DHTTYPE); // Criamos um objeto chamado 'dht' para controlar o sensor
+Adafruit_NeoPixel pixels(NUM_LEDS, PIN_LEDS, NEO_GRB + NEO_KHZ800); // Criamos o objeto 'pixels' para controlar as luzes
+
+// =================================================================
+// 4. PALETA DE CORES
+// =================================================================
+// O computador entende cores misturando Vermelho(R), Verde(G) e Azul(B).
+// Os números vão de 0 (apagado) a 255 (brilho máximo).
+// Criamos "apelidos" para as cores para não ter que digitar os números toda hora.
+
+uint32_t corAzulClaro = pixels.Color(50, 150, 255); // Mistura um pouco de vermelho, médio verde e muito azul
+uint32_t corLaranja   = pixels.Color(255, 100, 0);  // Muito vermelho e médio verde dá laranja
+uint32_t corAmarelo   = pixels.Color(255, 255, 0);  // Vermelho e Verde no talo dá amarelo
+uint32_t corVermelho  = pixels.Color(255, 0, 0);    // Só vermelho
+uint32_t corCiano     = pixels.Color(0, 255, 255);  // Verde e Azul dá ciano (azul piscina)
+uint32_t corAzul      = pixels.Color(0, 0, 255);    // Só azul
+
+// =================================================================
+// 5. SETUP (A Preparação)
+// =================================================================
+// Essa parte do código roda UMA VEZ SÓ quando você liga o Arduino.
+// Serve para ligar os motores e preparar o terreno.
+
+void setup() {
+  Serial.begin(9600); // Liga a comunicação com o computador para mostrar textos na tela
+  
+  dht.begin();    // Liga o sensor de temperatura
+  pixels.begin(); // Liga a fita de LED
+  pixels.clear(); // Garante que todos os LEDs comecem apagados
+  pixels.show();  // Envia o comando "apagar" para a fita
+  
+  Serial.println(F("Sistema Iniciado! Lendo sensor...")); // Mensagem de boas-vindas
+}
+
+// =================================================================
+// 6. LOOP (O Trabalho Repetitivo)
+// =================================================================
+// Essa parte roda para sempre, milhares de vezes por segundo (ou na velocidade que a gente mandar).
+
+void loop() {
+  // O sensor DHT11 é meio lento. Precisamos dar um descanso de 2 segundos para ele.
+  delay(2000); 
+
+  // --- LEITURA DOS DADOS ---
+  // Criamos duas variáveis (gavetas) para guardar os números que o sensor mediu
+  float umidade = dht.readHumidity();
+  float temperatura = dht.readTemperature();
+
+  // --- SEGURANÇA (Verificação de Erro) ---
+  // Às vezes o sensor falha ou o fio solta. 'isnan' significa "Is Not a Number" (Não é um número).
+  // Se a leitura não for um número válido, a gente avisa e tenta de novo.
+  if (isnan(umidade) || isnan(temperatura)) {
+    Serial.println(F("Ops! Falha ao ler o sensor DHT!"));
+    return; // O 'return' faz o código voltar para o início do loop imediatamente
+  }
+
+  // ==========================================
+  // LÓGICA DA TEMPERATURA (Controla o LED 0)
+  // ==========================================
+  // Aqui usamos "SE" (if) e "SENÃO" (else) para decidir a cor.
+  // pixels.setPixelColor(NÚMERO_DO_LED, COR); -> Lembrando que o primeiro LED é o 0.
+
+  if (temperatura < 20) {
+    // Se estiver frio (menos de 20 graus)
+    pixels.setPixelColor(0, corAzulClaro);
+  } 
+  else if (temperatura >= 20 && temperatura < 25) {
+    // Se estiver entre 20 e 25 (Ameno)
+    pixels.setPixelColor(0, corLaranja);
+  } 
+  else if (temperatura >= 25 && temperatura < 30) {
+    // Se estiver entre 25 e 30 (Morno)
+    pixels.setPixelColor(0, corAmarelo);
+  } 
+  else {
+    // Se for qualquer coisa acima de 30 (Quente)
+    pixels.setPixelColor(0, corVermelho);
+  }
+
+  // ==========================================
+  // LÓGICA DA UMIDADE (Controla o LED 1)
+  // ==========================================
+  // Agora controlamos o segundo LED da fita (o número 1).
+
+  if (umidade < 40) {
+    // Ar seco
+    pixels.setPixelColor(1, corLaranja);
+  } 
+  else if (umidade >= 40 && umidade <= 70) {
+    // Umidade boa
+    pixels.setPixelColor(1, corCiano);
+  } 
+  else {
+    // Ar muito úmido (acima de 70%)
+    pixels.setPixelColor(1, corAzul);
+  }
+
+  // --- ATUALIZAÇÃO FINAL ---
+  // Até agora, só avisamos ao Arduino o que fazer, mas as luzes não mudaram.
+  // O comando .show() é o que realmente "empurra" a cor para os LEDs acenderem.
+  pixels.show();
+
+  // --- MONITORAMENTO ---
+  // Mostra os valores na tela do computador para a gente conferir se as cores batem com os números.
+  Serial.print(F("Temp: ")); 
+  Serial.print(temperatura); 
+  Serial.print(F("°C  |  Umid: ")); 
+  Serial.print(umidade); 
+  Serial.println(F("%"));
+}
