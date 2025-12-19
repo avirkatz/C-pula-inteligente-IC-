@@ -62,12 +62,8 @@ int lerDistanciaCm() {
 }
 
 void atualizaTemperatura() {
-  // LEDs 0–3
   if (isnan(temperatura)) {
-    pintaFaixa(0, 3, corAzulClaro); // sem leitura
-    return;
-  }
-
+    pintaFaixa(0, 3, corAzulClaro);}
   if (temperatura < 20)       pintaFaixa(0, 3, corAzulClaro);
   else if (temperatura < 25)  pintaFaixa(0, 3, corLaranja);
   else if (temperatura < 30)  pintaFaixa(0, 3, corAmarelo);
@@ -75,11 +71,9 @@ void atualizaTemperatura() {
 }
 
 void atualizaUmidade() {
-  // LEDs 4–7
   if (isnan(umidade)) {
-    pintaFaixa(4, 7, corAzulClaro); // sem leitura
-    return;
-  }
+    pintaFaixa(4, 7, corAzulClaro);
+    return;}
 
   if (umidade < 40)          pintaFaixa(4, 7, corLaranja);
   else if (umidade <= 70)    pintaFaixa(4, 7, corCiano);
@@ -87,7 +81,6 @@ void atualizaUmidade() {
 }
 
 void atualizaLuminosidade() {
-  // LEDs 8–11
   if (luminosidade < LIMIAR_ESCURO)        pintaFaixa(8, 11, corBranco);
   else if (luminosidade < LIMIAR_MODERADO) pintaFaixa(8, 11, corVerdeEscuro);
   else                                     pintaFaixa(8, 11, corRoxo);
@@ -138,16 +131,13 @@ void loop() {
     distanciaCm = lerDistanciaCm();
   }
 
-  // 2) Atualiza faixas de LEDs com base nas leituras atuais
   atualizaTemperatura();
   atualizaUmidade();
   atualizaLuminosidade();
   atualizaProximidade();
 
-  // 3) Mostra LEDs
   FastLED.show();
 
-  // 4) Log (não spammar demais)
   static unsigned long tLog = 0;
   if (agora - tLog >= 500) {
     tLog = agora;
