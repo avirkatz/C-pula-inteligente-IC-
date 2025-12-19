@@ -1,141 +1,170 @@
-// =================================================================
-// 1. BIBLIOTECAS (As Caixas de Ferramentas)
-// =================================================================
-#include <Adafruit_NeoPixel.h>
+#include <FastLED.h>
 #include "DHT.h"
 
-// =================================================================
-// 2. CONFIGURAÇÕES (O Mapa da Fiação)
-// =================================================================
-#define PIN_DHT 2
 #define PIN_LEDS 6
-#define NUM_LEDS 10
+#define NUM_LEDS 16
 
+#define PIN_DHT 2
 #define DHTTYPE DHT11
 
-// --- NOVO: Sensor de luminosidade (LDR) ---
-#define PIN_LDR A0   // O ponto do meio do divisor de tensão vai no A0
+#define PIN_LDR A0
 
-// =================================================================
-// 3. OBJETOS (Dando nome aos bois)
-// =================================================================
+const int pinoTrig = 9;
+const int pinoEcho = 10;
+
+CRGB leds[NUM_LEDS];
 DHT dht(PIN_DHT, DHTTYPE);
-Adafruit_NeoPixel pixels(NUM_LEDS, PIN_LEDS, NEO_GRB + NEO_KHZ800);
 
-// =================================================================
-// 4. PALETA DE CORES
-// =================================================================
-uint32_t corAzulClaro   = pixels.Color(50, 150, 255);
-uint32_t corLaranja     = pixels.Color(255, 100, 0);
-uint32_t corAmarelo     = pixels.Color(255, 255, 0);
-uint32_t corVermelho    = pixels.Color(255, 0, 0);
-uint32_t corCiano       = pixels.Color(0, 255, 255);
-uint32_t corAzul        = pixels.Color(0, 0, 255);
+const CRGB corAzulClaro   = CRGB(50, 150, 255);
+const CRGB corLaranja     = CRGB(255, 100, 0);
+const CRGB corAmarelo     = CRGB(255, 255, 0);
+const CRGB corVermelho    = CRGB(255, 0, 0);
+const CRGB corCiano       = CRGB(0, 255, 255);
+const CRGB corAzul        = CRGB(0, 0, 255);
 
-// --- NOVO: Cores para luminosidade ---
-uint32_t corBranco      = pixels.Color(255, 255, 255);
-uint32_t corVerdeEscuro = pixels.Color(0, 120, 0);
-uint32_t corRoxo        = pixels.Color(160, 0, 255);
+const CRGB corBranco      = CRGB(255, 255, 255);
+const CRGB corVerdeEscuro = CRGB(0, 120, 0);
+const CRGB corRoxo        = CRGB(160, 0, 255);
 
-// =================================================================
-// 4.1 LIMIARES (Ajuste fino das faixas)
-// =================================================================
-// O analogRead no Arduino retorna de 0 até 1023.
-// Esses números variam MUITO com o LDR, o resistor e o ambiente.
-// Depois de ver no Serial, você ajusta até ficar perfeito.
+const CRGB corVerde       = CRGB(0, 255, 0);
+const CRGB corApagado     = CRGB(0, 0, 0);
 
-const int LIMIAR_ESCURO   = 300;  // abaixo disso = ambiente escuro
-const int LIMIAR_MODERADO = 700;  // entre 300 e 700 = moderado; acima = iluminado
+const int LIMIAR_ESCURO   = 300;
+const int LIMIAR_MODERADO = 700;
 
-// =================================================================
-// 5. SETUP (A Preparação)
-// =================================================================
-void setup() {
-  Serial.begin(9600);
+float umidade = NAN;
+float temperatura = NAN;
+int luminosidade = 0;
+int distanciaCm = 0;
 
-  dht.begin();
-  pixels.begin();
-  pixels.clear();
-  pixels.show();
+unsigned long tDHT = 0;
+unsigned long tLDR = 0;
+unsigned long tUS  = 0;
 
-  Serial.println(F("Sistema Iniciado! Lendo sensores..."));
+const unsigned long DT_DHT = 2000; // DHT11: 2s é o ideal
+const unsigned long DT_LDR = 200;  // LDR pode ser mais rápido
+const unsigned long DT_US  = 100;  // Ultrassônico mais rápido
+
+void pintaFaixa(int ini, int fim, const CRGB &cor) {
+  for (int i = ini; i <= fim; i++) leds[i] = cor;
 }
 
-// =================================================================
-// 6. LOOP (O Trabalho Repetitivo)
-// =================================================================
-void loop() {
-  delay(2000);
+int lerDistanciaCm() {
+  digitalWrite(pinoTrig, LOW);
+  delayMicroseconds(2);
+  digitalWrite(pinoTrig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(pinoTrig, LOW);
 
-  // --- LEITURA DOS DADOS ---
-  float umidade = dht.readHumidity();
-  float temperatura = dht.readTemperature();
+  unsigned long dur = pulseIn(pinoEcho, HIGH, 30000UL); // ~30ms timeout
+  if (dur == 0) return 0;
+  return (int)(dur / 58);
+}
 
-  // --- NOVO: Leitura do LDR ---
-  int luminosidade = analogRead(PIN_LDR);
-
-  // --- SEGURANÇA (Verificação de Erro) ---
-  if (isnan(umidade) || isnan(temperatura)) {
-    Serial.println(F("Ops! Falha ao ler o sensor DHT!"));
+void atualizaTemperatura() {
+  // LEDs 0–3
+  if (isnan(temperatura)) {
+    pintaFaixa(0, 3, corAzulClaro); // sem leitura
     return;
   }
 
-  // ==========================================
-  // LÓGICA DA TEMPERATURA (Controla o LED 0)
-  // ==========================================
-  if (temperatura < 20) {
-    pixels.setPixelColor(0, corAzulClaro);
-  }
-  else if (temperatura >= 20 && temperatura < 25) {
-    pixels.setPixelColor(0, corLaranja);
-  }
-  else if (temperatura >= 25 && temperatura < 30) {
-    pixels.setPixelColor(0, corAmarelo);
-  }
-  else {
-    pixels.setPixelColor(0, corVermelho);
-  }
-
-  // ==========================================
-  // LÓGICA DA UMIDADE (Controla o LED 1)
-  // ==========================================
-  if (umidade < 40) {
-    pixels.setPixelColor(1, corLaranja);
-  }
-  else if (umidade >= 40 && umidade <= 70) {
-    pixels.setPixelColor(1, corCiano);
-  }
-  else {
-    pixels.setPixelColor(1, corAzul);
-  }
-
-  // ==========================================
-  // NOVO: LÓGICA DA LUMINOSIDADE (Controla o LED 2)
-  // ==========================================
-  // Regra:
-  // Ambiente escuro -> Branco
-  // Ambiente moderado -> Verde escuro
-  // Ambiente iluminado -> Roxo
-
-  if (luminosidade < LIMIAR_ESCURO) {
-    pixels.setPixelColor(2, corBranco);
-  }
-  else if (luminosidade >= LIMIAR_ESCURO && luminosidade < LIMIAR_MODERADO) {
-    pixels.setPixelColor(2, corVerdeEscuro);
-  }
-  else {
-    pixels.setPixelColor(2, corRoxo);
-  }
-
-  // --- ATUALIZAÇÃO FINAL ---
-  pixels.show();
-
-  // --- MONITORAMENTO ---
-  Serial.print(F("Temp: "));
-  Serial.print(temperatura);
-  Serial.print(F("°C  |  Umid: "));
-  Serial.print(umidade);
-  Serial.print(F("%  |  Luz (A0): "));
-  Serial.println(luminosidade);
+  if (temperatura < 20)       pintaFaixa(0, 3, corAzulClaro);
+  else if (temperatura < 25)  pintaFaixa(0, 3, corLaranja);
+  else if (temperatura < 30)  pintaFaixa(0, 3, corAmarelo);
+  else                        pintaFaixa(0, 3, corVermelho);
 }
-// a princípio eu li aqui e acho que tá tudo ok. Mais tarde confiro novamente
+
+void atualizaUmidade() {
+  // LEDs 4–7
+  if (isnan(umidade)) {
+    pintaFaixa(4, 7, corAzulClaro); // sem leitura
+    return;
+  }
+
+  if (umidade < 40)          pintaFaixa(4, 7, corLaranja);
+  else if (umidade <= 70)    pintaFaixa(4, 7, corCiano);
+  else                       pintaFaixa(4, 7, corAzul);
+}
+
+void atualizaLuminosidade() {
+  // LEDs 8–11
+  if (luminosidade < LIMIAR_ESCURO)        pintaFaixa(8, 11, corBranco);
+  else if (luminosidade < LIMIAR_MODERADO) pintaFaixa(8, 11, corVerdeEscuro);
+  else                                     pintaFaixa(8, 11, corRoxo);
+}
+
+void atualizaProximidade() {
+
+  if (distanciaCm > 0 && distanciaCm < 10) pintaFaixa(12, 15, corVermelho);
+  else if (distanciaCm >= 10 && distanciaCm < 30) pintaFaixa(12, 15, corAmarelo);
+  else if (distanciaCm >= 30 && distanciaCm < 50) pintaFaixa(12, 15, corVerde);
+  else pintaFaixa(12, 15, corAzulClaro); 
+}
+
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(pinoTrig, OUTPUT);
+  pinMode(pinoEcho, INPUT);
+
+  dht.begin();
+
+  FastLED.addLeds<WS2812B, PIN_LEDS, GRB>(leds, NUM_LEDS);
+  FastLED.setBrightness(80);
+
+  FastLED.clear();
+  FastLED.show();
+
+  Serial.println(F("Sistema integrado (DHT + LDR + Ultrassonico + LEDs) iniciado!"));
+}
+
+void loop() {
+  unsigned long agora = millis();
+
+  // 1) Atualiza leituras em tempos diferentes
+  if (agora - tDHT >= DT_DHT) {
+    tDHT = agora;
+    umidade = dht.readHumidity();
+    temperatura = dht.readTemperature();
+  }
+
+  if (agora - tLDR >= DT_LDR) {
+    tLDR = agora;
+    luminosidade = analogRead(PIN_LDR);
+  }
+
+  if (agora - tUS >= DT_US) {
+    tUS = agora;
+    distanciaCm = lerDistanciaCm();
+  }
+
+  // 2) Atualiza faixas de LEDs com base nas leituras atuais
+  atualizaTemperatura();
+  atualizaUmidade();
+  atualizaLuminosidade();
+  atualizaProximidade();
+
+  // 3) Mostra LEDs
+  FastLED.show();
+
+  // 4) Log (não spammar demais)
+  static unsigned long tLog = 0;
+  if (agora - tLog >= 500) {
+    tLog = agora;
+
+    Serial.print(F("Temp: "));
+    if (isnan(temperatura)) Serial.print(F("ERRO"));
+    else Serial.print(temperatura);
+
+    Serial.print(F(" C | Umid: "));
+    if (isnan(umidade)) Serial.print(F("ERRO"));
+    else Serial.print(umidade);
+
+    Serial.print(F(" % | Luz(A0): "));
+    Serial.print(luminosidade);
+
+    Serial.print(F(" | Dist: "));
+    if (distanciaCm == 0) Serial.println(F("FORA"));
+    else { Serial.print(distanciaCm); Serial.println(F(" cm")); }
+  }
+}
